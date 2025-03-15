@@ -1,0 +1,162 @@
+██╗      ██████╗  ██████╗██╗  ██╗     ██████╗ ███╗   ██╗
+██║     ██╔═══██╗██╔════╝██║ ██╔╝    ██╔═══██╗████╗  ██║
+██║     ██║   ██║██║     █████╔╝     ██║   ██║██╔██╗ ██║
+██║     ██║   ██║██║     ██╔═██╗     ██║   ██║██║╚██╗██║
+███████╗╚██████╔╝╚██████╗██║  ██╗    ╚██████╔╝██║ ╚████║
+╚══════╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝     ╚═════╝ ╚═╝  ╚═══╝
+                                          
+-- LocalScript placed inside StarterPlayerScripts or StarterGui
+
+local UserInputService = game:GetService("UserInputService")
+local Players = game:GetService("Players")
+local Camera = game.Workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+
+local isLockingOn = false
+local closestPlayer = nil
+local lockDistance = 50 -- Maximum distance to consider for locking on
+
+-- Function to find the closest player
+local function findClosestPlayer()
+    local closestDistance = lockDistance
+    local targetPlayer = nil
+    
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local distance = (LocalPlayer.Character.HumanoidRootPart.Position - player.Character.Head.Position).Magnitude
+            if distance < closestDistance then
+                closestDistance = distance
+                targetPlayer = player
+            end
+        end
+    end
+    
+    return targetPlayer
+end
+
+-- Function to lock on to the closest player's head
+local function lockOnToPlayerHead(player)
+    if player and player.Character and player.Character:FindFirstChild("Head") then
+        Camera.CFrame = CFrame.new(Camera.CFrame.Position, player.Character.Head.Position)
+    end
+end
+
+-- Detect mouse input (Right Mouse Button)
+UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right Mouse Button
+        isLockingOn = true
+    end
+end)
+
+UserInputService.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then -- Right Mouse Button
+        isLockingOn = false
+    end
+end)
+
+-- Main loop to update lock-on state
+game:GetService("RunService").Heartbeat:Connect(function()
+    if isLockingOn then
+        closestPlayer = findClosestPlayer()
+        if closestPlayer then
+            lockOnToPlayerHead(closestPlayer)
+        end
+    end
+end)
+
+███████╗███████╗██████╗ 
+██╔════╝██╔════╝██╔══██╗
+█████╗  ███████╗██████╔╝
+██╔══╝  ╚════██║██╔═══╝ 
+███████╗███████║██║     
+╚══════╝╚══════╝╚═╝
+     
+local players = game:GetService("Players")
+local localPlayer = players.LocalPlayer
+local camera = workspace.CurrentCamera
+local runService = game:GetService("RunService")
+
+local espObjects = {}
+
+local function createESP(player)
+    local box = Drawing.new("Square")
+    box.Thickness = 2
+    box.Color = Color3.fromRGB(255, 0, 0) -- Default Red
+    box.Filled = false
+    box.Transparency = 1
+
+    local healthBar = Drawing.new("Line")
+    healthBar.Thickness = 2
+    healthBar.Transparency = 1
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Color = Color3.fromRGB(255, 255, 255) -- White text
+    nameTag.Size = 16
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Visible = false
+
+    espObjects[player] = { box = box, healthBar = healthBar, nameTag = nameTag }
+end
+
+local function removeESP(player)
+    if espObjects[player] then
+        for _, obj in pairs(espObjects[player]) do
+            obj:Remove()
+        end
+        espObjects[player] = nil
+    end
+end
+
+local function updateESP()
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= localPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") and player.Character:FindFirstChild("Humanoid") then
+            local rootPart = player.Character.HumanoidRootPart
+            local humanoid = player.Character.Humanoid
+            local screenPosition, onScreen = camera:WorldToViewportPoint(rootPart.Position)
+
+            if onScreen then
+                if not espObjects[player] then
+                    createESP(player)
+                end
+                
+                local esp = espObjects[player]
+                local distance = (rootPart.Position - camera.CFrame.Position).Magnitude
+                local size = math.clamp(3000 / distance, 50, 200)
+                local boxSize = Vector2.new(size, size * 1.5)
+                local boxPosition = Vector2.new(screenPosition.X - boxSize.X / 2, screenPosition.Y - boxSize.Y / 2)
+
+                -- Update Box
+                esp.box.Size = boxSize
+                esp.box.Position = boxPosition
+                esp.box.Visible = true
+
+                -- Update Health Bar
+                local healthPercent = humanoid.Health / humanoid.MaxHealth
+                esp.healthBar.Color = Color3.fromRGB(255 * (1 - healthPercent), 255 * healthPercent, 0) -- Green to Red
+                esp.healthBar.From = Vector2.new(boxPosition.X - 5, boxPosition.Y + boxSize.Y)
+                esp.healthBar.To = Vector2.new(boxPosition.X - 5, boxPosition.Y + (1 - healthPercent) * boxSize.Y)
+                esp.healthBar.Visible = true
+
+                -- Update NameTag
+                esp.nameTag.Text = player.Name
+                esp.nameTag.Position = Vector2.new(boxPosition.X + boxSize.X / 2, boxPosition.Y - 15)
+                esp.nameTag.Visible = true
+            else
+                if espObjects[player] then
+                    espObjects[player].box.Visible = false
+                    espObjects[player].healthBar.Visible = false
+                    espObjects[player].nameTag.Visible = false
+                end
+            end
+        else
+            removeESP(player)
+        end
+    end
+end
+
+players.PlayerRemoving:Connect(removeESP)
+runService.RenderStepped:Connect(updateESP)
